@@ -1,0 +1,99 @@
+# golangci-lint v2 configuration for HastyConnect
+# Enforces slog usage via depguard (bans "import log") and general quality gates.
+# Run: make lint   |   Fix: make lint-fix
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - errcheck      # unchecked errors
+    - govet         # go vet checks
+    - ineffassign   # ineffectual assignments
+    - staticcheck   # advanced static analysis (includes gosimple)
+    - unused        # unused code
+    # depguard excluded: revive imports-blocklist handles exact import banning
+    - revive        # flexible extensible linter
+    - misspell      # spelling mistakes
+    - unconvert     # unnecessary type conversions
+    - gocritic      # comprehensive style/correctness checks
+
+  settings:
+    revive:
+      rules:
+        # Ban exact import of the standard "log" package — use log/slog instead.
+        # revive matches the import path exactly, so "log" does NOT match "log/slog".
+        - name: imports-blocklist
+          severity: error
+          arguments:
+            - "log"
+        - name: context-as-argument
+          severity: warning
+        - name: error-return
+          severity: warning
+        - name: error-strings
+          severity: warning
+        - name: error-naming
+          severity: warning
+        - name: exported
+          severity: warning
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - unnamedResult
+        - hugeParam
+        - whyNoLint
+
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - goimports   # enforce import grouping: stdlib / external / internal
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/ghuser/ghproject
+
+issues:
+  exclude-rules:
+    # Test files: relax errcheck for deferred cleanup and httpNoBody style suggestions.
+    - path: _test\.go
+      linters:
+        - errcheck
+    - path: _test\.go
+      linters:
+        - gocritic
+      text: httpNoBody
+
+    # sqlc-generated files: skip style linters.
+    - path: infrastructure/persistence/postgres/db/
+      linters:
+        - gocritic
+        - revive
+        - errcheck
+
+    # Swagger-generated docs.
+    - path: docs/swagger/
+      linters:
+        - gocritic
+        - revive
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  text:
+    path: stdout
+    print-linter-name: true
+    print-issued-lines: true
+    colors: true

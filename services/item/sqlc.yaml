@@ -1,0 +1,12 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "infrastructure/persistence/postgres/queries"
+    schema: "../../migrations/item"
+    gen:
+      go:
+        package: "db"
+        out: "infrastructure/persistence/postgres/db"
+        emit_interface: true
+        emit_prepared_queries: false
+        sql_package: "database/sql"

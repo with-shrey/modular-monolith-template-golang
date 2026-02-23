@@ -1,0 +1,65 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+tmp/
+dist/
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.*
+
+# Dependency directories
+vendor/
+
+# Go workspace file (local)
+go.work
+go.work.sum
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+
+# Temporary files
+*.log
+*.tmp
+
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+node_modules/
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+database/
+
+# Task files
+tasks.json
+tasks/
+
+.env

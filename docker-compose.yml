@@ -1,0 +1,129 @@
+services:
+  # Infrastructure Services (7 total)
+
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: hasty
+      POSTGRES_PASSWORD: dev_password_123
+      POSTGRES_DB: hasty_definition
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - hasty_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-hasty}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - hasty_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - hasty_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.23.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgres
+      - DB_PORT=5432
+      - POSTGRES_USER=hasty
+      - POSTGRES_PWD=dev_password_123
+      - POSTGRES_SEEDS=postgres
+    ports:
+      - "7233:7233"
+    networks:
+      - hasty_network
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.22.0
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8088:8080"
+    networks:
+      - hasty_network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: ./deployments/docker/api.dev.Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: gow -e=go run cmd/api/main.go
+    networks:
+      - hasty_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./deployments/docker/api.dev.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: gow -e=go run cmd/worker/main.go
+    networks:
+      - hasty_network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  hasty_network:
+    driver: bridge

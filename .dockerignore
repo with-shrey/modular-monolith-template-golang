@@ -1,0 +1,40 @@
+# Version control
+.git
+.github
+.gitignore
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Build artifacts
+tmp
+dist
+bin
+vendor
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files (exclude from production builds)
+**/*_test.go
+
+# Node modules (if any)
+node_modules
+
+# Documentation
+*.md
+!CLAUDE.md
+
+# Planning
+.planning
+.claude

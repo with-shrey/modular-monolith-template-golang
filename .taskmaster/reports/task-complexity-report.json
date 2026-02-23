@@ -1,0 +1,109 @@
+{
+	"meta": {
+		"generatedAt": "2026-02-23T10:21:19.382Z",
+		"tasksAnalyzed": 12,
+		"totalTasks": 26,
+		"analysisCount": 12,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 15,
+			"taskTitle": "Add value objects and domain factory methods to item service domain layer",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down the implementation into: (1) Create ItemName value object with validation in item_name.go, (2) Update Item aggregate to use ItemName type in item.go, (3) Add NewItem factory method with invariant enforcement, (4) Update ItemService.Create to use factory method, (5) Update repository and handler to handle ItemName.String() conversions. Each subtask should be a single file modification with clear acceptance criteria.",
+			"reasoning": "This task requires creating new domain constructs (value objects and factory methods) following DDD patterns. The complexity is moderate because: (1) The codebase already has a clean domain structure, (2) ItemName validation logic is straightforward (length constraints), (3) Integration points are limited to a single service (ItemService), repository, and handler. However, it requires careful coordination across domain, application, and infrastructure layers while maintaining Clean Architecture boundaries. The task is well-defined with clear examples."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Add sentinel error types to domain layer and centralized error-to-HTTP mapping helper",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Divide into: (1) Create domain/errors.go with sentinel errors (ErrItemNotFound, ErrItemAlreadyExists, ErrInvalidItemName), (2) Create pkg/errhttp/errhttp.go with WriteError and mapErrorToStatus functions, (3) Update ItemRepository.GetByID to return ErrItemNotFound on pgx.ErrNoRows, (4) Update ItemRepository.Save to return ErrItemAlreadyExists on constraint violations, (5) Update ItemService validation to use domain errors, (6) Update post_item.go handler to use errhttp.WriteError. Each subtask focuses on one layer of the architecture.",
+			"reasoning": "Medium-high complexity due to: (1) Cross-cutting changes across all architectural layers (domain → application → infrastructure → handlers), (2) Requires understanding Go error wrapping semantics (errors.Is, fmt.Errorf with %w), (3) Need to detect PostgreSQL constraint violations (pgconn.PgError with code 23505), (4) Must maintain Clean Architecture dependency rules (domain errors flow outward, never inward). The detailed specification reduces risk, but error handling is inherently subtle and easy to get wrong. Testing error paths comprehensively adds complexity."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "Implement transactional outbox pattern for guaranteed at-least-once event delivery",
+			"complexityScore": 8,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Structure as: (1) Create outbox migration (00003_outbox_table.sql) with proper indexes, (2) Add sqlc queries for outbox operations (InsertOutboxEvent, GetUnpublishedOutboxEvents, MarkOutboxEventPublished), (3) Regenerate sqlc code (make sqlc), (4) Refactor ItemRepository.Save to use pgx transactions (Begin/Commit/Rollback), (5) Create pkg/outbox/relay.go with OutboxRelay struct and processOutbox logic, (6) Update cmd/worker/main.go to start OutboxRelay goroutine, (7) Add worker Dockerfile and docker-compose service, (8) Remove direct EventBus.Publish from ItemService (replaced by outbox). Each subtask has clear dependencies and verification steps.",
+			"reasoning": "High complexity because: (1) Introduces distributed systems pattern (transactional outbox) with subtle correctness requirements, (2) Requires understanding of PostgreSQL transaction isolation and pgx connection pooling, (3) Involves creating a new long-running background worker process with graceful shutdown, (4) Must handle at-least-once delivery semantics correctly (idempotency considerations), (5) Adds new infrastructure component (outbox relay) with polling loop and error handling, (6) Changes core write path (ItemRepository.Save) from simple insert to transaction management, (7) Integration testing is complex (requires verifying eventual consistency). The pattern is well-documented but has many moving parts and failure modes to consider."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Implement auth middleware with tenant context extraction",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Organize as: (1) Create pkg/auth/context.go with OrgIDFromCtx, WithOrgID, and ErrOrgIDNotFound, (2) Create pkg/auth/middleware.go with RequireAuth chi middleware, (3) Wire RequireAuth in cmd/api/main.go route setup, (4) Update post_item.go handler to extract OrgID from context instead of request body, (5) Remove OrgID from CreateItemRequest struct and update Swagger annotations, (6) Add integration tests for auth middleware (valid session, missing session, invalid session, multi-tenant isolation). Each subtask is a distinct layer or concern.",
+			"reasoning": "Medium-high complexity due to: (1) Critical security implications (authentication bypass or tenant isolation bugs are high-severity), (2) Requires understanding Go context propagation patterns and chi middleware chains, (3) Must integrate with existing gorilla/sessions cookie store, (4) Changes request flow for all authenticated endpoints (scope larger than just item service), (5) Requires careful UUID parsing and validation with proper error handling, (6) Multi-tenant isolation testing is essential but nuanced, (7) Must maintain backward compatibility with existing session structure. Well-specified but touches security-critical code paths."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Implement domain services layer with stateless business validation functions",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Split into: (1) Create services/item/domain/services/item_validator.go with ValidateName function (control chars, consecutive spaces, leading/trailing whitespace checks), (2) Add ValidateItemForCreation for cross-field validation (OrgID not nil, ID not nil, delegates to ValidateName), (3) Update ItemService.Create to call domain validator before repository operations. Each subtask is a single file or integration point.",
+			"reasoning": "Low-medium complexity because: (1) Domain services are pure functions with no external dependencies (only stdlib and domain types), (2) Validation logic is straightforward (string operations, unicode checks), (3) Integration point is simple (single call in ItemService.Create before repo.Save), (4) The task has clear examples and well-defined business rules, (5) Testing is simple (pure unit tests, no mocks needed). Main complexity is ensuring business rules are comprehensive and match real requirements. Dependencies on Task 15 (ItemName value object) may add coordination overhead."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Implement worker process binary at cmd/worker/main.go with event subscribers and outbox relay",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Divide into: (1) Create cmd/worker/main.go skeleton with config/logger/telemetry setup (copy from cmd/api/main.go), (2) Add infrastructure initialization (database pool, Redis, EventBus, Temporal), (3) Create registerSubscribers function and handleItemCreated event handler stub, (4) Implement runOutboxRelay goroutine with ticker and shutdown handling, (5) Add graceful shutdown with signal handling and context cancellation, (6) Create deployments/docker/worker.Dockerfile (development and production stages), (7) Add worker service to docker-compose.yml with health checks and dependencies. Each subtask is a cohesive unit.",
+			"reasoning": "High complexity due to: (1) Creating a new production binary from scratch (requires understanding entire initialization sequence), (2) Long-running process with multiple concurrent goroutines (event subscribers + outbox relay), (3) Requires graceful shutdown coordination (signal handling, context cancellation, WaitGroups), (4) Event subscriber implementation must be idempotent (calls events.IsEventProcessed and MarkEventProcessed from Task 22), (5) Docker multi-stage builds for development and production, (6) Dependencies on Tasks 7 (EventBus), 17 (outbox pattern), and 22 (idempotency), making this a capstone integration task. High integration risk and many failure modes to handle."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "Extend ItemRepository with full CRUD and paginated query operations",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Structure as: (1) Update domain/repositories/item.go interface with QueryOpts struct and new methods (FindByOrgID, Update, Delete, Exists), (2) Add sqlc queries to queries/item.sql (FindItemsByOrgID, CountItemsByOrgID, UpdateItem, DeleteItem, ItemExists), (3) Regenerate sqlc code (make sqlc), (4) Implement repository methods in item_repository.go (FindByOrgID with pagination, Update, Delete, Exists), (5) Add ItemService.List and ItemService.Delete use cases in item_service.go, (6) Write integration tests for each new repository method. Each subtask is a distinct layer (domain interface → SQL queries → implementation → use cases).",
+			"reasoning": "Medium complexity because: (1) Extends existing repository pattern with standard CRUD operations (not introducing new patterns), (2) Requires sqlc query syntax for pagination (LIMIT/OFFSET), COUNT aggregation, and EXISTS checks, (3) FindByOrgID must return both paginated items AND total count (two queries), (4) All operations must be multi-tenant safe (scoped by orgID), (5) Delete operation should check existence first (defensive programming), (6) Integration tests need database setup and verification of correct SQL behavior. Well-understood CRUD operations but requires attention to multi-tenancy and pagination edge cases."
+		},
+		{
+			"taskId": 22,
+			"taskTitle": "Add EventID and Version fields to domain events for idempotency and schema evolution",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break into: (1) Update domain/events/item.go to add EventID and Version fields to ItemCreatedEvent, (2) Create processed_events migration (00003_processed_events.sql) with proper indexes, (3) Create pkg/events/dedup.go with IsEventProcessed and MarkEventProcessed helpers, (4) Update ItemService.publish to set EventID (uuid.New()) and Version (1) and add metadata to Watermill message, (5) Document metadata preservation in EventBus.Publish (comment update), (6) Provide example subscriber implementation with deduplication for cmd/worker/main.go (Task 20), (7) Add schema evolution documentation and metadata standards. Each subtask addresses one aspect (event schema, persistence, deduplication logic, integration).",
+			"reasoning": "Medium-high complexity due to: (1) Introduces distributed systems concern (event deduplication) with correctness implications, (2) Requires new database table with primary key on event_id for idempotency tracking, (3) Must integrate with existing Watermill EventBus metadata propagation, (4) Schema evolution support requires designing versioning strategy (breaking changes, backward compatibility), (5) Deduplication logic must handle race conditions (INSERT ON CONFLICT DO NOTHING), (6) Subscribers must query processed_events before handling (adds latency), (7) Strong dependency on Task 20 (worker implementation) for actual usage. Well-specified but introduces new architectural pattern."
+		},
+		{
+			"taskId": 23,
+			"taskTitle": "Replace gorilla/sessions CookieStore with Redis-backed session store for horizontal scaling",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Organize as: (1) Add rbcsoft/redisstore dependency and refactor pkg/auth/session.go to use RedisStore (NewSessionStore signature change), (2) Update pkg/app/main.go Application struct to include SessionStore field, (3) Update cmd/api/main.go to initialize RedisStore and pass to Application, (4) Update cmd/worker/main.go (if exists) to initialize SessionStore for consistency, (5) Write pkg/auth/session_test.go integration tests (session creation, retrieval, Redis key format, TTL verification, concurrent sessions). Each subtask is a distinct integration point or test suite.",
+			"reasoning": "Medium complexity because: (1) Introduces new dependency (rbcsoft/redisstore) requiring go.mod update, (2) Changes session storage backend from client-side cookies to server-side Redis (architectural shift), (3) Requires understanding RedisStore configuration (key prefix, TTL, serialization), (4) Must maintain backward compatibility with existing session API (gorilla/sessions interface), (5) Existing cookie-based sessions need migration strategy (natural expiration approach), (6) Integration tests require live Redis instance (not pure unit tests), (7) Must verify Redis memory usage and eviction policies for production. Dependencies on Tasks 1 (Redis) and 3 (Redis health check) are already complete, reducing risk."
+		},
+		{
+			"taskId": 24,
+			"taskTitle": "Implement CQRS read model cache layer with Redis for item service",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Structure as: (1) Create pkg/cache/item_cache.go with CachedItem struct and ItemCache (Get, Set, Delete, Exists methods using Redis hashes), (2) Update ItemService constructor to accept ItemCache dependency, (3) Implement read-through cache in ItemService.GetByID (check cache → query Postgres on miss → warm cache async), (4) Update services/item/application/services/main.go factory to wire ItemCache, (5) Add cache warming subscriber in cmd/worker/main.go handleItemCreated, (6) Write pkg/cache/item_cache_test.go unit tests (Set/Get round-trip, TTL verification, Delete, Exists), (7) Write integration tests for GetByID cache hit/miss paths. Each subtask is a cohesive unit (cache layer → integration → subscriber → tests).",
+			"reasoning": "High complexity due to: (1) Introduces CQRS pattern with denormalized read models (architectural pattern), (2) Requires understanding read-through cache semantics (check cache → fallback → warm), (3) Async cache warming must not block request paths (goroutines with background context), (4) Event-driven cache consistency (worker subscribes to item.created to warm cache), (5) Redis hash operations (HMSET, HGETALL) with JSON marshaling/unmarshaling, (6) Cache failure tolerance (degraded mode when Redis unavailable), (7) Multi-tenant safety (cache keys scoped by orgID), (8) Dependencies on Tasks 1 (Redis) and 20 (worker for warming). Complex integration testing (verify Postgres queries skip on cache hit). This is an advanced optimization pattern."
+		},
+		{
+			"taskId": 25,
+			"taskTitle": "Write comprehensive unit tests for item service domain layer including value objects, factories, validators, and error types",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Divide by test file: (1) Create services/item/domain/models/item_test.go with ItemName value object tests (valid names, empty, max length, leading/trailing whitespace, only whitespace) and NewItem factory tests (valid construction, invalid name propagation, nil OrgID), (2) Create services/item/domain/services/item_validator_test.go with ValidateName tests (valid names, reserved keywords, profanity filter, special char limits) and ValidateItem tests, (3) Create services/item/domain/errors_test.go with sentinel error tests (errors.Is semantics, error messages, wrapping preservation), (4) Create services/item/domain/events/item_test.go with event JSON marshaling tests and TopicItemCreated constant verification. Each subtask is one test file with comprehensive coverage.",
+			"reasoning": "Low-medium complexity because: (1) All tests are pure unit tests with zero external dependencies (no DB, HTTP, mocks), (2) Testing pure domain logic is straightforward (input → validation → output), (3) Well-defined test patterns (table-driven tests for value objects, boundary testing for validation), (4) The task provides extensive examples and expected test cases, reducing ambiguity, (5) Go testing stdlib is simple and familiar. Main complexity is ensuring comprehensive coverage (>90%) and testing all edge cases (boundary values, error messages, sentinel error semantics). Dependencies on Tasks 15 (value objects) and 19 (validators) must be complete first."
+		},
+		{
+			"taskId": 26,
+			"taskTitle": "Add production environment validation to config loading",
+			"complexityScore": 3,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Organize as: (1) Add ValidateForProduction function to pkg/config/config.go with ValidationError struct (check SESSION_AUTH_KEY ≥32 bytes, SESSION_ENCRYPTION_KEY ≥16 bytes, LOG_LEVEL not debug, optional SENTRY_DSN/OTEL_ENDPOINT warnings), (2) Update cmd/api/main.go to call ValidateForProduction immediately after config.Load with os.Exit(1) on error, (3) Update pkg/auth/session.go NewSessionStore signature to accept environment string and automatically set Secure flag based on production, (4) Write pkg/config/config_test.go unit tests (valid production config, development skip, short keys fail, debug log level fail). Each subtask is a single file or integration point.",
+			"reasoning": "Low complexity because: (1) Simple validation logic (length checks, string comparisons), (2) Non-breaking change (only validates when ENVIRONMENT=production), (3) Clear security requirements (session key lengths, no debug logging), (4) Follows existing config loading pattern (ardanlabs/conf), (5) Limited scope (single validation function + caller update), (6) Unit tests are straightforward (mock Config structs with various values). Main risk is ensuring validation catches all production misconfigurations without false positives. Dependencies on Task 10 (security audit) provide context."
+		}
+	]
+}

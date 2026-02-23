@@ -1,0 +1,90 @@
+basePath: /api
+definitions:
+  CreateItemRequest:
+    properties:
+      name:
+        example: Sample Item
+        maxLength: 255
+        minLength: 3
+        type: string
+      owner_name:
+        example: Sample Item
+        maxLength: 255
+        minLength: 3
+        type: string
+    required:
+    - name
+    - owner_name
+    type: object
+  CreateItemResponse:
+    properties:
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      name:
+        example: Sample Item
+        type: string
+      org_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  ErrorResponse:
+    properties:
+      error:
+        example: org_id and name are required
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@hastyconnect.com
+    name: API Support
+  description: Modular monolith API built with DDD and Clean Architecture.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: HastyConnect API
+  version: "1.0"
+paths:
+  /item:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new item scoped to an organization
+      parameters:
+      - description: Item creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CreateItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CreateItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Create item
+      tags:
+      - items
+schemes:
+- http
+- https
+swagger: "2.0"
